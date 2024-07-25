@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=0.6">
+  <title>Matching Game</title>
+  <style>
+  *{
+  transition: 500ms;}
+  body{
+    background-color: black;
+  }
+    .game-container {
+      width: 800px;
+      margin: 40px auto;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .button-container {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 20px;
+    }
+
+    .button {
+      width: 100px;
+      height: 40px;
+      border: none;
+      border-radius: 10px;
+      background-color: #4CAF50;
+      color: #fff;
+      cursor: pointer;
+    }
+
+    .inventory-container {
+      display: flex;
+      margin-bottom: 20px;
+    }
+
+    .inventory-slot {
+      width: 40px;
+      height: 40px;
+      border: 1px solid #aaa;
+      border-radius: 10px;
+      margin: 10px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-size: 20px;
+      cursor: pointer;
+      background-color: #aaa;
+      color: #aaa;
+      transition: background-color 0.3s ease, color 0.3s ease, transform 0.3s ease;
+    }
+
+    .inventory-slot.active {
+      background-color: #aaa;
+      color: #333;
+      transform: scale(1.1); /* Add a slight scale effect */
+    }
+
+    .inventory-slot.matched {
+      background-color: #aaa;
+      color: #333;
+      transform: scale(1.2); /* Bigger scale effect for matched */
+      animation: matched-animation 0.5s ease-in-out;
+    }
+
+    .inventory-slot.disappearing {
+      opacity: 0;
+      transform: scale(0.5);
+      animation: disappearing-animation 0.5s ease-in-out forwards;
+    }
+
+    .game-board {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .column {
+      display: flex;
+      flex-direction: column-reverse; /* Column을 뒤집어 위에서 아래로 정렬 */
+      align-items: center;
+      margin: 10px;
+    }
+
+    .tile {
+      width: 40px;
+      height: 40px;
+      border: 1px solid #aaa;
+      border-radius: 50%;
+      margin: 0px;
+      cursor: pointer;
+      position: relative;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-size: 40px;
+      background-color: #aaa;
+      color: #aaa;
+      transition: background-color 0.3s ease, color 0.3s ease, transform 0.3s ease;
+    }
+
+    .tile.active {
+      background-color: #aaa;
+      color: #333;
+      transform: scale(1.1); /* Add a slight scale effect */
+    }
+
+    .tile.matched {
+      background-color: #aaa;
+      color: #333;
+      transform: scale(1.2); /* Bigger scale effect for matched */
+      animation: matched-animation 0.5s ease-in-out;
+    }
+
+    .tile.disappearing {
+      opacity: 0;
+      transform: scale(0.5);
+      animation: disappearing-animation 0.5s ease-in-out forwards;
+    }
+
+    .score-container {
+      margin-top: 20px;
+      font-size: 24px;
+      font-weight: bold;
+      color: #fff;
+    }
+
+    /* Animation styles */
+    @keyframes matched-animation {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.2); }
+      100% { transform: scale(1); }
+    }
+
+    @keyframes disappearing-animation {
+      0% { opacity: 1; transform: scale(1); }
+      100% { opacity: 0; transform: scale(0.5); }
+    }
+
+    /* 애니메이션 추가: 타일 이동 */
+    .tile.move-to-inventory {
+      animation: move-to-inventory-animation 0.5s ease-in-out forwards;
+    }
+
+    @keyframes move-to-inventory-animation {
+      0% { transform: translate(0, 0); }
+      100% { transform: translate(0, 10); opacity: 0; } 
+    }
+
+    /* 애니메이션 추가: 새로운 타일 생성 */
+    /* .tile.new-tile {
+      animation: new-tile-animation 0.5s ease-in-out forwards;
+    }
+
+    @keyframes new-tile-animation {
+      0% { transform: translateY(40px); opacity: 0; }
+      100% { transform: translateY(0); opacity: 1; }
+    } */
+
+    /* 애니메이션 추가: 스코어 증가 */
+    .score-container.increase-score {
+      animation: increase-score-animation 0.5s ease-in-out forwards;
+    }
+
+    @keyframes increase-score-animation {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.2); }
+      100% { transform: scale(1); }
+    }
+  </style>
+</head>
+<body>
+  <div class="game-container">
+    <div class="score-container" id="score-container">
+      <p>Score: <span id="score">0</span></p>
+    </div>
+    <!-- <div class="button-container">
+      <button class="undo-button">뒤로가기</button>
+      <button class="auto-button">요술막대기</button>
+      <button class="refresh-button">새로고침</button>
+    </div> -->
+    <div class="inventory-container" id="inventory-container">
+      <!-- 인벤토리 슬롯 7개를 미리 생성 -->
+      <div class="inventory-slot"></div>
+      <div class="inventory-slot"></div>
+      <div class="inventory-slot"></div>
+      <div class="inventory-slot"></div>
+      <div class="inventory-slot"></div>
+      <div class="inventory-slot"></div>
+      <div class="inventory-slot"></div>
+    </div>
+    <div class="game-board" id="game-board"></div>
+  </div>
+
+  <script>
+    const undoButton = document.querySelector('.undo-button');
+    const autoButton = document.querySelector('.auto-button');
+    const refreshButton = document.querySelector('.refresh-button');
+    const inventoryContainer = document.getElementById('inventory-container');
+    const gameBoard = document.getElementById('game-board');
+    const scoreElement = document.getElementById('score');
+    const scoreContainer = document.getElementById('score-container'); // 스코어 컨테이너 요소 추가
+
+    let score = 0;
+    let inventory = []; // Inventory slots
+    let tileStacks = []; // Array to store tiles in each column
+    let selectedTile = null; // Currently selected tile
+    let matchedTiles = []; // Array to store matched tiles for animation
+    let moves = []; // Moves for undo functionality
+
+    // Tile types and their corresponding colors
+    const tileTypes = {
+      'red': '🔴',
+      'blue': '🔵',
+      'green': '🟢',
+      'yellow': '🟡',
+      'orange': '🟠',
+      'purple': '🟣'
+    };
+
+    // Function to generate the game board
+    function generateGameBoard() {
+      gameBoard.innerHTML = ''; // Clear existing board
+      tileStacks = [];
+      moves = [];
+      inventory = [];
+      // Reset inventory slots
+      const inventorySlots = document.querySelectorAll('.inventory-slot');
+      inventorySlots.forEach(slot => {
+        slot.textContent = '';
+        slot.dataset.type = '';
+        slot.classList.remove('active', 'matched', 'disappearing');
+ 
+      });
+
+      // Create columns
+      for (let i = 0; i < 7; i++) {
+        const column = document.createElement('div');
+        column.className = 'column';
+        gameBoard.appendChild(column);
+
+        const tilesInColumn = [];
+        // Create tiles in each column
+        for (let j = 0; j < 10; j++) {
+          const tile = document.createElement('div');
+          tile.className = 'tile';
+          tile.dataset.type = getRandomTileType();
+          tile.textContent = tileTypes[tile.dataset.type];
+          column.appendChild(tile);
+          tilesInColumn.push(tile);
+        }
+        tileStacks.push(tilesInColumn);
+      }
+
+      // Add event listeners to tiles
+      const tiles = document.querySelectorAll('.tile');
+      tiles.forEach((tile) => {
+        tile.addEventListener('click', handleTileClick);
+      });
+
+      // Stack tiles in each column
+
+      // Generate new tiles at the bottom
+      generateNewTiles();
+      stackTiles();
+        }
+
+    // Generate new tiles at the bottom
+    function generateNewTiles() {
+      // Add new tiles at the bottom of each column
+      tileStacks.forEach((tilesInColumn, columnIndex) => {
+        const newTile = document.createElement('div');
+        newTile.className = 'tile new-tile'; // Add 'new-tile' class for animation
+        newTile.dataset.type = getRandomTileType();
+        newTile.textContent = tileTypes[newTile.dataset.type];
+        gameBoard.children[columnIndex].appendChild(newTile); // Append to the correct column
+        tilesInColumn.push(newTile); // Add new tile to the column array
+        // Add event listener
+        newTile.addEventListener('click', handleTileClick);
+        // Set the new tile position (position of the last tile + 40px)
+        // newTile.style.top = `${(tilesInColumn.length - 1) * 40}px`;
+      });
+    }
+
+    // Get a random tile type
+    function getRandomTileType() {
+      const tileTypesArray = Object.keys(tileTypes);
+      return tileTypesArray[Math.floor(Math.random() * tileTypesArray.length)];
+    }
+
+    // Stack the tiles in each column
+    function stackTiles() {
+      tileStacks.forEach((tilesInColumn, columnIndex) => {
+        // Stack tiles in each column
+        for (let i = 0; i < tilesInColumn.length - 1; i++) {
+          const tile = tilesInColumn[i];
+          const nextTile = tilesInColumn[i + 1];
+          // tile.style.top = `${i * 40}px`;
+          // nextTile.style.top = `${(i + 1) * 40}px`;
+        }
+      });
+    }
+
+    // Handle tile clicks
+    function handleTileClick(event) {
+      const tile = event.target;
+
+      // Move tile to inventory if space available
+      if (inventory.length < 7) {
+        // Move tile to inventory slot
+        inventory.push(tile);
+        const inventorySlotIndex = inventory.length - 1;
+        const inventorySlot = inventoryContainer.children[inventorySlotIndex];
+        inventorySlot.dataset.type = tile.dataset.type;
+        inventorySlot.textContent = tileTypes[tile.dataset.type];
+        inventorySlot.style.opacity = 1; // Make opaque
+        // Add click event listener to the new inventory slot
+        inventorySlot.addEventListener('click', handleInventoryClick);
+        moves.push({ action: 'move', tile: tile, inventorySlot: inventorySlot });
+        // Remove tile from the game board
+        tile.classList.add('move-to-inventory'); // Add animation class
+        setTimeout(() => { // 애니메이션 후에 타일을 제거
+          tile.remove();
+        }, 500);
+        checkMatch();
+      }
+    }
+
+    // Check for matches in the inventory
+    function checkMatch() {
+      // Check for matches of three consecutive tiles in inventory
+      for (let i = 0; i < inventory.length - 2; i++) { 
+        const tile1 = inventory[i].dataset.type;
+        const tile2 = inventory[i + 1].dataset.type;
+        const tile3 = inventory[i + 2].dataset.type;
+        if (tile1 === tile2 && tile2 === tile3) {
+          // Match tiles and remove them
+          matchTiles(inventory[i], inventory[i + 1], inventory[i + 2]);
+          removeMatchedTiles();
+
+          // Generate new tiles after removing
+          generateNewTiles();
+          return; // Only check for one match at a time
+        }
+      }
+    }
+
+    // Handle inventory clicks
+    function handleInventoryClick(event) {
+      const slot = event.target;
+
+      // Deselect currently selected tile if any
+      if (selectedTile) {
+        selectedTile.classList.remove('active');
+        selectedTile = null;
+      } else {
+        // Select the clicked tile
+        selectedTile = slot;
+        selectedTile.classList.add('active');
+      }
+    }
+
+    // Match tiles and update score
+    function matchTiles(tile1, tile2, tile3) {
+      if (tile1 && tile2 && tile3) {
+        // Mark tiles as matched and add animation
+        tile1.classList.add('matched');
+        tile2.classList.add('matched');
+        tile3.classList.add('matched');
+        tile1.classList.add('match-animation');
+        tile2.classList.add('match-animation');
+        tile3.classList.add('match-animation');
+        matchedTiles.push(tile1, tile2, tile3);
+
+        // Remove matched tiles after animation
+        setTimeout(() => {
+          tile1.classList.remove('active', 'matched', 'match-animation');
+          tile2.classList.remove('active', 'matched', 'match-animation');
+          tile3.classList.remove('active', 'matched', 'match-animation');
+          // Remove tiles from the game board
+          tile1.remove();
+          tile2.remove();
+          tile3.remove();
+          // Update score
+          score += 10;
+          updateScore();
+          selectedTile = null; // Deselect tile
+          checkMatch(); // Check for new matches
+          // Clear inventory if all tiles are matched
+          if (document.querySelectorAll('.tile:not(.matched)').length === 0) {
+            clearInventory();
+          }
+        }, 500); // Animation duration
+      }
+    }
+
+    // Remove matched tiles from the inventory
+    function removeMatchedTiles() {
+      // Remove matched tiles from the inventory array
+      matchedTiles.forEach(tile => {
+        const index = inventory.indexOf(tile);
+        if (index !== -1) {
+          inventory.splice(index, 1);
+          // Remove the corresponding inventory slot
+          const inventorySlot = inventoryContainer.children[index];
+          inventorySlot.classList.add('disappearing');
+          setTimeout(() => {
+            inventorySlot.remove();
+          }, 500); // Animation duration
+          const inventorySlot2 = inventoryContainer.children[index+1];
+          inventorySlot2.classList.add('disappearing');
+          setTimeout(() => {
+            inventorySlot2.remove();
+          }, 500); // Animation duration
+          const inventorySlot3 = inventoryContainer.children[index+2];
+          inventorySlot3.classList.add('disappearing');
+          setTimeout(() => {
+            inventorySlot3.remove();
+          }, 500); // Animation duration
+        }
+      });
+      matchedTiles = []; // Reset matched tiles array
+
+      // Add new inventory slots after removing matched ones
+      for (let i = 0; i < 3; i++) {
+        const newSlot = document.createElement('div');
+        newSlot.className = 'inventory-slot';
+        inventoryContainer.appendChild(newSlot);
+        newSlot.addEventListener('click', handleInventoryClick);
+        // 초기에는 불투명하게 설정
+       // newSlot.style.opacity = 0.5;
+      }
+    }
+    // Undo the last move
+    function undoLastMove() {
+      if (moves.length > 0) {
+        const lastMove = moves.pop();
+        if (lastMove.action === 'move') {
+          // Move the tile back to its original position on the board
+          lastMove.tile.parentNode.appendChild(lastMove.tile);
+          lastMove.tile.style.top = ''; // Reset position
+          // Remove the tile from the inventory
+          inventory.splice(inventory.indexOf(lastMove.tile), 1);
+          // Remove the inventory slot
+          lastMove.inventorySlot.remove();
+          // Restack tiles
+          stackTiles();
+        }
+      }
+    }
+
+    // Auto-play (not implemented for simplicity)
+    function autoPlay() {
+      // Implement logic to find and automatically match tiles
+    }
+
+    // Refresh the game
+    function refreshGame() {
+      score = 0;
+      inventory = [];
+      selectedTile = null;
+      matchedTiles = [];
+      moves = [];
+      updateScore();
+      generateGameBoard();
+    }
+
+    // Update the score display
+    function updateScore() {
+      scoreElement.textContent = score;
+      scoreContainer.classList.add('increase-score'); // Add animation class
+      setTimeout(() => {
+        scoreContainer.classList.remove('increase-score'); // Remove animation class
+      }, 500); // Animation duration
+    }
+
+    // Clear the inventory (for game over)
+    function clearInventory() {
+      const inventorySlots = document.querySelectorAll('.inventory-slot');
+      inventorySlots.forEach(slot => {
+        slot.classList.add('disappearing');
+        setTimeout(() => {
+          slot.remove();
+        }, 500); // Animation duration
+      });
+      inventory = [];
+    }
+
+    // Initialize the game
+    generateGameBoard();
+
+    // Event listeners for buttons
+    undoButton.addEventListener('click', undoLastMove);
+    refreshButton.addEventListener('click', refreshGame);
+    autoButton.addEventListener('click', autoPlay);
+  </script>
+</body>
+</html>
